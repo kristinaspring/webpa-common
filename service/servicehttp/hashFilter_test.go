@@ -36,7 +36,7 @@ func testNewHashFilterNoSelf(t *testing.T) {
 				accessor = new(service.MockAccessor)
 				reject   = errors.New("reject")
 
-				f = NewHashFilter(accessor, reject, record...)
+				f = NewHashFilter(accessor, reject, "http", record...)
 			)
 
 			require.NotNil(f)
@@ -64,7 +64,7 @@ func testNewHashFilterPass(t *testing.T) {
 				accessor.On("Get", ids[i].Bytes()).Return(self[i], error(nil)).Times(2)
 			}
 
-			f := NewHashFilter(accessor, errors.New("reject"), self...)
+			f := NewHashFilter(accessor, errors.New("reject"), "http", self...)
 			require.NotNil(f)
 
 			for i := 0; i < selfCount; i++ {
@@ -103,7 +103,7 @@ func testNewHashFilterReject(t *testing.T) {
 				self[i] = fmt.Sprintf("instance-%d", i)
 			}
 
-			f := NewHashFilter(accessor, reject, self...)
+			f := NewHashFilter(accessor, reject, "http", self...)
 			require.NotNil(f)
 
 			assert.Equal(
@@ -135,7 +135,7 @@ func testNewHashFilterParseError(t *testing.T) {
 		accessor = new(service.MockAccessor)
 	)
 
-	f := NewHashFilter(accessor, errors.New("reject"), "instance-1")
+	f := NewHashFilter(accessor, errors.New("reject"), "http", "instance-1")
 	require.NotNil(f)
 
 	request := httptest.NewRequest("GET", "/", nil)
@@ -157,7 +157,7 @@ func testNewHashFilterHashError(t *testing.T) {
 
 	accessor.On("Get", mock.MatchedBy(func([]byte) bool { return true })).Return("", hashErr).Times(2)
 
-	f := NewHashFilter(accessor, errors.New("reject"), "instance-1")
+	f := NewHashFilter(accessor, errors.New("reject"), "http", "instance-1")
 	require.NotNil(f)
 
 	assert.Equal(

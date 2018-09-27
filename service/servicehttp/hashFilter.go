@@ -15,9 +15,12 @@ import (
 // Any request that does not hash to one of the "self" instances is rejected by returning the supplied error.
 // If self is empty, an always-allow xfilter is returned instead.
 //
+// For each self value, both the value itself and it's normalized version via service.NormalizeInstance are
+// used to identify this server instance.
+//
 // The returned filter will check the request's context for a device id, using that to hash with if one is found.
 // Otherwise, the device key is parsed from the request via device.IDHashParser.
-func NewHashFilter(a service.Accessor, reject error, self ...string) xfilter.Interface {
+func NewHashFilter(a service.Accessor, reject error, defaultScheme string, self ...string) xfilter.Interface {
 	// filter out any blank strings from the self, which allows for injected values that can
 	// disable the hash filter.
 	var filteredSelf []string
@@ -25,6 +28,9 @@ func NewHashFilter(a service.Accessor, reject error, self ...string) xfilter.Int
 		s = strings.TrimSpace(s)
 		if len(s) > 0 {
 			filteredSelf = append(filteredSelf, s)
+			if n, err := service.NormalizeInstance(defaultScheme, s); err == nil {
+				filteredSelf = append(filteredSelf, n)
+			}
 		}
 	}
 
@@ -32,12 +38,19 @@ func NewHashFilter(a service.Accessor, reject error, self ...string) xfilter.Int
 		return xfilter.Allow()
 	}
 
-	// compute this value once, for logging
-	selfValue := strings.Join(filteredSelf, ",")
-
 	selfSet := make(map[string]bool, len(self))
 	for _, i := range filteredSelf {
 		selfSet[i] = true
+	}
+
+	// use the map keys to create the logging value for deduping
+	var selfValue string
+	for k := range selfSet {
+		if len(selfValue) > 0 {
+			selfValue = selfValue + ","
+		}
+
+		selfValue = selfValue + k
 	}
 
 	return xfilter.Func(func(r *http.Request) error {
