@@ -213,7 +213,12 @@ func TestDnsReadyFail(t *testing.T) {
 	assert.NotNil(err)
 }
 
-/*func TestDnsReadySuccess(t *testing.T) {
+func TestDnsReadySuccess(t *testing.T) {
+	var (
+		err    error
+		done   = make(chan struct{})
+		server = make(chan struct{})
+	)
 	assert := assert.New(t)
 
 	v := SetUpTestViperInstance(TEST_AWS_CFG)
@@ -229,7 +234,11 @@ func TestDnsReadyFail(t *testing.T) {
 	}()
 	dnsServer := &dns.Server{Addr: ":5079", Net: "tcp"}
 	go func() {
-		dnsServer.ListenAndServe()
+
+		err = dnsServer.ListenAndServe()
+		if err != nil {
+			server <- struct{}{}
+		}
 	}()
 	defer dnsServer.Shutdown()
 
@@ -240,10 +249,19 @@ func TestDnsReadyFail(t *testing.T) {
 	registry, _ := xmetrics.NewRegistry(&xmetrics.Options{}, Metrics)
 	ss.Initialize(nil, selfUrl, "localhost:5079", nil, nil, registry, func() time.Time { return time.Unix(TEST_UNIX_TIME, 0) })
 
-	err = ss.DnsReady()
-
-	assert.Nil(err)
-}*/
+	go func() {
+		err = ss.DnsReady()
+		done <- struct{}{}
+	}()
+	select {
+	case <-server:
+		assert.FailNow("dns server has closed")
+	case <-done:
+		assert.NoError(err)
+	case <-time.After(5 * time.Second):
+		assert.FailNow("Test timed out")
+	}
+}
 
 func TestDnsReadyNoSOASuccess(t *testing.T) {
 	assert := assert.New(t)
